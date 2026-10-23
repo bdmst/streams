@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스트림스 플레이어</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Jua', sans-serif; background: #e2e8f0; color: #1e3a8a; }
+        .grid-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; max-w: 400px; margin: 0 auto; }
+        .box { 
+            aspect-ratio: 1; background: white; border: 3px solid #cbd5e1; border-radius: 12px;
+            font-size: 1.5rem; font-weight: bold; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .box:not(.filled):hover { border-color: #3b82f6; background: #eff6ff; }
+        .box.filled { background: #f8fafc; border-color: #94a3b8; cursor: not-allowed; color: #1e3a8a; }
+        .box.star { color: #fbbf24; text-shadow: 0 0 5px rgba(251,191,36,0.3); }
+    </style>
+</head>
+<body class="flex flex-col items-center py-8 px-4 min-h-screen">
+
+    <!-- 1. 로그인 (접속) 영역 -->
+    <div id="login-section" class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl mt-10">
+        <h1 class="text-3xl font-bold text-center mb-6 text-indigo-900">스트림스 입장</h1>
+        <div class="mb-4">
+            <label class="block text-gray-700 text-lg mb-2">선생님이 알려준 PIN 번호</label>
+            <input type="text" id="pin-input" class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 text-2xl text-center" placeholder="예: 1234">
+        </div>
+        <div class="mb-6">
+            <label class="block text-gray-700 text-lg mb-2">내 이름 (또는 닉네임)</label>
+            <input type="text" id="name-input" class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 text-xl text-center" placeholder="이름을 입력하세요">
+        </div>
+        <button id="btn-join" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-2xl py-4 rounded-xl font-bold shadow-lg transition-all">
+            게임 방 들어가기
+        </button>
+    </div>
+
+    <!-- 2. 게임 플레이 영역 (처음엔 숨겨짐) -->
+    <div id="game-section" class="hidden flex-col items-center w-full">
+        <div class="flex justify-between w-full max-w-md mb-4 px-2">
+            <div class="text-lg bg-indigo-100 px-4 py-1 rounded-lg">참여자: <span id="display-name" class="font-bold"></span></div>
+            <div class="text-lg bg-yellow-100 px-4 py-1 rounded-lg">현재 점수: <span id="current-score" class="font-bold text-red-500">0</span>점</div>
+        </div>
+
+        <div class="bg-white rounded-[2rem] shadow-lg p-6 w-full max-w-md flex flex-col items-center mb-6">
+            <p class="text-gray-500 mb-2">선생님이 뽑은 현재 번호</p>
+            <div class="h-32 w-32 bg-indigo-50 border-4 border-indigo-200 rounded-2xl flex items-center justify-center mb-2">
+                <span id="current-drawn-number" class="text-6xl font-bold text-indigo-900">대기중</span>
+            </div>
+            <p id="instruction-text" class="text-red-500 text-sm h-5">선생님이 번호를 뽑을 때까지 기다려주세요.</p>
+        </div>
+
+        <!-- 20개의 빈칸 그리드 -->
+        <div class="grid-container" id="board">
+            <!-- 자바스크립트로 20개 생성됨 -->
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, get, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // ★ [여기를 수정하세요] admin.html에 넣었던 본인의 firebaseConfig를 동일하게 붙여넣으세요! ★
+        const firebaseConfig = {
+            apiKey: "AIzaSyC_R6-EMFx9H_L4Pp0lJWUj5rzZ_ZtCg0g",
+            authDomain: "streams-game-8b9ef.firebaseapp.com",
+            databaseURL: "https://streams-game-8b9ef-default-rtdb.firebaseio.com",
+            projectId: "streams-game-8b9ef",
+            storageBucket: "streams-game-8b9ef.firebasestorage.app",
+            messagingSenderId: "688248392489",
+            appId: "1:688248392489:web:c6576aaab9ae71b1c74538",
+            measurementId: "G-QC5ZWVRRL3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const loginSection = document.getElementById('login-section');
+        const gameSection = document.getElementById('game-section');
+        const boardEl = document.getElementById('board');
+        const currentNumberEl = document.getElementById('current-drawn-number');
+        const instructionText = document.getElementById('instruction-text');
+        const scoreEl = document.getElementById('current-score');
+
+        let roomPin = "";
+        let playerName = "";
+        let currentNumberToPlace = null;
+        let drawnCount = 0;
+        let placedCount = 0;
+        let boardData = Array(20).fill(null); // 20개의 빈칸 데이터
+
+        // 스트림스 점수표 (인덱스 = 연결된 개수)
+        const scoreTable = [0, 0, 1, 3, 5, 7, 9, 11, 15, 20, 25, 30, 35, 40, 50, 60, 70, 85, 100, 150, 300];
+
+        // 20개 빈칸 UI 생성
+        for(let i=0; i<20; i++) {
+            const box = document.createElement('div');
+            box.className = 'box';
+            box.dataset.index = i;
+            
+            // 번호 배치 클릭 이벤트
+            box.addEventListener('click', async () => {
+                if (currentNumberToPlace === null) return; // 배치할 번호가 없으면 무시
+                if (boardData[i] !== null) return; // 이미 채워진 칸이면 무시
+                if (placedCount >= drawnCount) {
+                    alert("이미 이번 번호를 배치했습니다. 다음 번호를 기다리세요.");
+                    return;
+                }
+
+                // 타일 배치
+                boardData[i] = currentNumberToPlace;
+                box.textContent = currentNumberToPlace;
+                box.classList.add('filled');
+                if (currentNumberToPlace === '★') box.classList.add('star');
+                
+                placedCount++;
+                currentNumberToPlace = null;
+                instructionText.textContent = "다음 번호를 기다리는 중...";
+                instructionText.className = "text-gray-500 text-sm h-5";
+
+                // 점수 계산 및 DB 업데이트
+                const currentScore = calculateScore(boardData);
+                scoreEl.textContent = currentScore;
+
+                await update(ref(db, `rooms/${roomPin}/players/${playerName}`), {
+                    board: boardData,
+                    score: currentScore
+                });
+            });
+            boardEl.appendChild(box);
+        }
+
+        // 게임 방 입장 로직
+        document.getElementById('btn-join').addEventListener('click', async () => {
+            const pin = document.getElementById('pin-input').value.trim();
+            const name = document.getElementById('name-input').value.trim();
+
+            if (!pin || !name) {
+                alert("PIN 번호와 이름을 모두 입력해주세요.");
+                return;
+            }
+
+            // DB에서 방 존재 여부 확인
+            const roomRef = ref(db, `rooms/${pin}`);
+            const snapshot = await get(roomRef);
+
+            if (!snapshot.exists()) {
+                alert("존재하지 않는 방 번호입니다. 선생님께 확인해주세요.");
+                return;
+            }
+
+            roomPin = pin;
+            playerName = name;
+
+            // 플레이어 초기 데이터 생성
+            await set(ref(db, `rooms/${roomPin}/players/${playerName}`), {
+                name: playerName,
+                score: 0,
+                board: boardData
+            });
+
+            // UI 전환
+            document.getElementById('display-name').textContent = playerName;
+            loginSection.classList.add('hidden');
+            gameSection.classList.remove('hidden');
+            gameSection.classList.add('flex');
+
+            // 관리자가 번호를 뽑을 때마다 감지하는 리스너
+            onValue(ref(db, `rooms/${roomPin}/drawnNumbers`), (data) => {
+                const numbers = data.val();
+                if (numbers && numbers.length > drawnCount) {
+                    drawnCount = numbers.length;
+                    const latestNumber = numbers[numbers.length - 1];
+                    currentNumberToPlace = latestNumber;
+                    
+                    currentNumberEl.textContent = latestNumber;
+                    currentNumberEl.className = latestNumber === '★' 
+                        ? 'text-6xl font-bold text-yellow-400 drop-shadow-md' 
+                        : 'text-6xl font-bold text-indigo-900';
+                    
+                    instructionText.textContent = "아래 20개 빈칸 중 하나를 눌러 배치하세요!";
+                    instructionText.className = "text-blue-600 font-bold text-sm h-5 animate-pulse";
+                }
+            });
+        });
+
+        // 스트림스 점수 계산 함수 로직
+        function calculateScore(board) {
+            let totalScore = 0;
+            let currentStreak = 0;
+            let prevNumber = -1; // 비교를 위한 이전 숫자
+
+            for (let i = 0; i < 20; i++) {
+                const val = board[i];
+                if (val === null) {
+                    // 빈칸을 만나면 흐름이 끊김
+                    totalScore += getScoreForStreak(currentStreak);
+                    currentStreak = 0;
+                    prevNumber = -1;
+                } else {
+                    if (currentStreak === 0) {
+                        currentStreak = 1;
+                        prevNumber = val;
+                    } else {
+                        // 현재 값이 조커이거나, 이전 값이 조커이거나, 오름차순이면 연결
+                        if (val === '★' || prevNumber === '★' || prevNumber <= val) {
+                            currentStreak++;
+                            prevNumber = val; // 이전 값을 현재 값으로 갱신
+                        } else {
+                            // 오름차순이 끊긴 경우
+                            totalScore += getScoreForStreak(currentStreak);
+                            currentStreak = 1; // 새로운 흐름 시작
+                            prevNumber = val;
+                        }
+                    }
+                }
+            }
+            // 마지막 남은 스트릭 점수 합산
+            totalScore += getScoreForStreak(currentStreak);
+            return totalScore;
+        }
+
+        function getScoreForStreak(length) {
+            if (length <= 0) return 0;
+            if (length >= 20) return scoreTable[20];
+            return scoreTable[length];
+        }
+    </script>
+</body>
+</html>

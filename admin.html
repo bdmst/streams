@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스트림스 게임 관리자</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Jua', sans-serif; background: linear-gradient(135deg, #1e3a8a, #4c1d95); color: white; }
+        /* 미니 보드용 스크롤바 숨김 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="flex flex-col items-center py-10 px-6 min-h-screen overflow-x-hidden">
+    
+    <h1 class="text-4xl font-bold mb-8 drop-shadow-md">스트림스 관리자 대시보드</h1>
+    
+    <!-- 1. 방 생성 영역 -->
+    <div id="setup-section" class="bg-white/10 p-10 rounded-3xl backdrop-blur-md text-center max-w-lg w-full mt-10">
+        <p class="mb-8 text-xl text-indigo-100">새로운 게임 방을 만들어 학생들을 초대하세요.</p>
+        <button id="btn-create-room" class="bg-pink-500 hover:bg-pink-400 text-white text-3xl px-10 py-5 rounded-2xl font-bold shadow-[0_8px_0_rgb(190,24,93)] hover:translate-y-1 hover:shadow-[0_4px_0_rgb(190,24,93)] transition-all">
+            새 게임 방 만들기
+        </button>
+    </div>
+
+    <!-- 2. 게임 진행 영역 -->
+    <div id="game-section" class="hidden flex-col items-center w-full max-w-5xl mt-4">
+        
+        <div class="flex flex-col md:flex-row items-center gap-10 w-full justify-center mb-8">
+            <!-- 왼쪽: 게임 컨트롤 -->
+            <div class="flex flex-col items-center">
+                <div class="flex items-center gap-4 mb-6 text-2xl bg-white/20 px-8 py-3 rounded-full backdrop-blur-sm">
+                    접속 PIN: <span id="room-pin" class="font-bold text-yellow-300 text-5xl tracking-wider"></span>
+                </div>
+                
+                <div class="h-64 w-64 bg-white rounded-[3rem] shadow-2xl flex items-center justify-center border-8 border-indigo-300 mb-6">
+                    <span id="current-number" class="text-[9rem] font-bold text-indigo-900 leading-none">?</span>
+                </div>
+                
+                <button id="btn-draw" class="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 text-3xl px-10 py-5 rounded-3xl font-bold shadow-[0_8px_0_rgb(161,98,7)] hover:translate-y-1 hover:shadow-[0_4px_0_rgb(161,98,7)] transition-all">
+                    번호 뽑기 (<span id="draw-count">0</span>/20)
+                </button>
+            </div>
+
+            <!-- 오른쪽: 실시간 학생 대시보드 -->
+            <div class="flex-1 w-full bg-white/10 p-6 rounded-3xl backdrop-blur-md h-[450px] overflow-hidden flex flex-col">
+                <h2 class="text-2xl mb-4 text-center font-bold text-indigo-100">🏆 실시간 학생 순위표</h2>
+                <div class="overflow-y-auto no-scrollbar flex-1 pr-2">
+                    <table class="w-full text-center border-collapse">
+                        <thead class="sticky top-0 bg-[#2e267d]">
+                            <tr class="text-lg text-indigo-200">
+                                <th class="p-3 rounded-tl-xl">순위</th>
+                                <th class="p-3">이름</th>
+                                <th class="p-3">점수</th>
+                                <th class="p-3 rounded-tr-xl">타일 현황 (20칸)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-list">
+                            <!-- 자바스크립트로 자동 생성됨 -->
+                            <tr><td colspan="4" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // ★ [필수] 발급받으신 firebaseConfig 객체로 아래를 꼭 교체하세요! ★
+        const firebaseConfig = {
+    apiKey: "AIzaSyC_R6-EMFx9H_L4Pp0lJWUj5rzZ_ZtCg0g",
+    authDomain: "streams-game-8b9ef.firebaseapp.com",
+    databaseURL: "https://streams-game-8b9ef-default-rtdb.firebaseio.com",
+    projectId: "streams-game-8b9ef",
+    storageBucket: "streams-game-8b9ef.firebasestorage.app",
+    messagingSenderId: "688248392489",
+    appId: "1:688248392489:web:c6576aaab9ae71b1c74538",
+    measurementId: "G-QC5ZWVRRL3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const baseTiles = [
+            ...Array.from({length: 10}, (_, i) => i + 1),
+            ...Array.from({length: 9}, (_, i) => i + 11),
+            ...Array.from({length: 9}, (_, i) => i + 11),
+            ...Array.from({length: 11}, (_, i) => i + 20),
+            '★'
+        ];
+
+        let availableTiles = [];
+        let currentPin = "";
+        let drawCount = 0;
+
+        const setupSection = document.getElementById('setup-section');
+        const gameSection = document.getElementById('game-section');
+        const roomPinEl = document.getElementById('room-pin');
+        const currentNumberEl = document.getElementById('current-number');
+        const drawCountEl = document.getElementById('draw-count');
+        const btnCreateRoom = document.getElementById('btn-create-room');
+        const btnDraw = document.getElementById('btn-draw');
+        const playerListEl = document.getElementById('player-list');
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // 새 게임 생성
+        btnCreateRoom.addEventListener('click', async () => {
+            currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+            availableTiles = [...baseTiles];
+            shuffle(availableTiles);
+            drawCount = 0;
+
+            await set(ref(db, 'rooms/' + currentPin), {
+                status: 'waiting',
+                drawnNumbers: [],
+                players: {} 
+            });
+
+            setupSection.classList.add('hidden');
+            gameSection.classList.remove('hidden');
+            gameSection.classList.add('flex');
+            roomPinEl.textContent = currentPin;
+
+            // ★ 실시간 학생 데이터 감지 및 랭킹표 렌더링 ★
+            onValue(ref(db, `rooms/${currentPin}/players`), (snapshot) => {
+                playerListEl.innerHTML = '';
+                
+                if (!snapshot.exists()) {
+                    playerListEl.innerHTML = `<tr><td colspan="4" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>`;
+                    return;
+                }
+
+                const playersData = snapshot.val();
+                const playersArray = Object.values(playersData);
+                
+                // 점수 기준 내림차순 정렬
+                playersArray.sort((a, b) => b.score - a.score);
+
+                playersArray.forEach((player, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-white/10 hover:bg-white/5 transition-colors";
+
+                    // 학생 보드 상태 미니 HTML 생성
+                    let boardHtml = `<div class="flex gap-1 justify-center py-2">`;
+                    player.board.forEach(tile => {
+                        if (tile === null) {
+                            boardHtml += `<div class="w-5 h-5 bg-white/20 rounded-sm text-[10px] flex items-center justify-center text-transparent">.</div>`;
+                        } else if (tile === '★') {
+                            boardHtml += `<div class="w-5 h-5 bg-yellow-400 text-yellow-900 rounded-sm font-bold text-[12px] flex items-center justify-center">★</div>`;
+                        } else {
+                            boardHtml += `<div class="w-5 h-5 bg-white text-indigo-900 rounded-sm font-bold text-[11px] flex items-center justify-center">${tile}</div>`;
+                        }
+                    });
+                    boardHtml += `</div>`;
+
+                    // 순위에 따른 메달 아이콘 추가
+                    let rankDisplay = `${index + 1}`;
+                    if (index === 0) rankDisplay = '🥇';
+                    else if (index === 1) rankDisplay = '🥈';
+                    else if (index === 2) rankDisplay = '🥉';
+
+                    tr.innerHTML = `
+                        <td class="p-3 text-2xl font-bold">${rankDisplay}</td>
+                        <td class="p-3 text-lg font-bold">${player.name}</td>
+                        <td class="p-3 text-2xl font-bold text-yellow-300">${player.score}</td>
+                        <td class="p-3">${boardHtml}</td>
+                    `;
+                    playerListEl.appendChild(tr);
+                });
+            });
+        });
+
+        // 번호 뽑기
+        btnDraw.addEventListener('click', async () => {
+            if (drawCount >= 20) return;
+
+            const drawnTile = availableTiles.pop();
+            
+            currentNumberEl.textContent = drawnTile;
+            currentNumberEl.className = drawnTile === '★' 
+                ? 'text-[9rem] font-bold text-yellow-400 leading-none drop-shadow-lg' 
+                : 'text-[9rem] font-bold text-indigo-900 leading-none';
+            
+            const drawnRef = ref(db, `rooms/${currentPin}/drawnNumbers/${drawCount}`);
+            await set(drawnRef, drawnTile);
+            
+            drawCount++;
+            drawCountEl.textContent = drawCount;
+
+            await update(ref(db, `rooms/${currentPin}`), { status: 'playing' });
+
+            if (drawCount >= 20) {
+                btnDraw.disabled = true;
+                btnDraw.classList.add('opacity-50', 'cursor-not-allowed');
+                setTimeout(() => alert("20개의 타일을 모두 뽑았습니다! 최종 랭킹을 확인하세요."), 500);
+            }
+        });
+    </script>
+</body>
+</html>
