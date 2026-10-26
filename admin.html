@@ -6,6 +6,8 @@
     <title>스트림스 게임 관리자</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <!-- QR 코드 생성 라이브러리 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Jua', sans-serif; background: linear-gradient(135deg, #1e3a8a, #4c1d95); color: white; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -34,6 +36,11 @@
                     접속 PIN: <span id="room-pin" class="font-bold text-yellow-300 text-4xl tracking-wider"></span>
                 </div>
                 
+                <!-- QR 코드 팝업 버튼 추가 -->
+                <button onclick="openQrModal()" class="mb-4 bg-indigo-500/80 hover:bg-indigo-400 border border-indigo-300/50 text-white text-lg px-6 py-2 rounded-xl font-bold transition-all shadow-md">
+                    📱 학생 접속용 QR코드 보기
+                </button>
+
                 <div class="h-56 w-56 bg-white rounded-[2.5rem] shadow-2xl flex items-center justify-center border-8 border-indigo-300 mb-4">
                     <span id="current-number" class="text-[8rem] font-bold text-indigo-900 leading-none">?</span>
                 </div>
@@ -85,6 +92,25 @@
         </div>
     </div>
 
+    <!-- 💡 대형 QR 코드 모달 창 -->
+    <div id="qr-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden flex items-center justify-center z-50 p-4" onclick="closeQrModal(event)">
+        <div class="bg-white rounded-[2rem] p-10 max-w-lg w-full shadow-2xl text-center flex flex-col items-center" onclick="event.stopPropagation()">
+            <h2 class="text-3xl font-bold text-indigo-900 mb-2">학생 접속용 QR코드</h2>
+            <p class="text-gray-500 mb-6">스마트폰이나 태블릿 카메라로 화면을 비춰주세요.</p>
+            
+            <div id="qrcode" class="p-4 border-4 border-indigo-100 rounded-2xl mb-6 flex justify-center bg-white"></div>
+            
+            <div class="bg-indigo-50 w-full p-4 rounded-xl mb-6 border border-indigo-100">
+                <p class="text-gray-600 mb-1">접속 후 아래 PIN 번호를 입력하세요</p>
+                <div class="text-5xl font-bold text-indigo-600 tracking-widest" id="modal-pin-display"></div>
+            </div>
+
+            <button onclick="closeQrModal(event)" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-4 rounded-xl font-bold text-xl transition-colors">
+                닫기
+            </button>
+        </div>
+    </div>
+
     <!-- 미배치 학생 알림 모달 창 -->
     <div id="unplaced-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-slate-800 text-center">
@@ -92,8 +118,7 @@
             <h3 class="text-2xl font-bold text-red-600 mb-2">아직 번호를 넣지 않은 학생이 있어요!</h3>
             <p class="text-gray-600 mb-4 text-sm">아래 학생들이 아직 이번 번호를 배치하지 않았습니다.</p>
             
-            <div id="unplaced-name-list" class="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto bg-slate-100 p-3 rounded-2xl mb-6">
-            </div>
+            <div id="unplaced-name-list" class="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto bg-slate-100 p-3 rounded-2xl mb-6"></div>
 
             <div class="flex gap-3">
                 <button onclick="closeUnplacedModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-3 rounded-xl font-bold text-lg">
@@ -137,6 +162,7 @@
         let currentPin = "";
         let drawCount = 0;
         let latestPlayersData = {}; 
+        let qrCodeInstance = null; // QR코드 인스턴스
 
         const setupSection = document.getElementById('setup-section');
         const gameSection = document.getElementById('game-section');
@@ -150,6 +176,8 @@
         const placedStatusCountEl = document.getElementById('placed-status-count');
         const unplacedModal = document.getElementById('unplaced-modal');
         const unplacedNameList = document.getElementById('unplaced-name-list');
+        const qrModal = document.getElementById('qr-modal');
+        const modalPinDisplay = document.getElementById('modal-pin-display');
 
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -158,7 +186,6 @@
             }
         }
 
-        // 학생 순위표 렌더링 통합 함수 (Firebase 배열 생략 오류 방지 적용)
         function renderPlayers() {
             playerListEl.innerHTML = '';
             
@@ -174,7 +201,6 @@
             let placedCompletedCount = 0;
 
             playersArray.forEach((player, index) => {
-                // 파이어베이스 데이터 변형 대응: 정확히 20칸 루프 돌며 배치된 타일 검사
                 let filledCount = 0;
                 for (let i = 0; i < 20; i++) {
                     if (player.board && player.board[i] !== null && player.board[i] !== undefined) {
@@ -248,6 +274,10 @@
             gameSection.classList.remove('hidden');
             gameSection.classList.add('flex');
             roomPinEl.textContent = currentPin;
+            modalPinDisplay.textContent = currentPin;
+
+            // 학생 페이지 주소 자동 계산 및 QR 생성
+            generateQRCode();
 
             onValue(ref(db, `rooms/${currentPin}/players`), (snapshot) => {
                 if (!snapshot.exists()) {
@@ -258,6 +288,33 @@
                 renderPlayers();
             });
         });
+
+        // 💡 QR 코드 생성 함수
+        function generateQRCode() {
+            // 현재 주소에서 admin.html 부분을 index.html로 치환하여 학생용 주소 만들기
+            let currentUrl = window.location.href.split('?')[0].split('#')[0];
+            let targetUrl = currentUrl.replace('admin.html', 'index.html');
+            if (currentUrl === targetUrl && !targetUrl.endsWith('.html')) {
+                targetUrl = targetUrl + (targetUrl.endsWith('/') ? '' : '/') + 'index.html';
+            }
+
+            document.getElementById('qrcode').innerHTML = "";
+            qrCodeInstance = new QRCode(document.getElementById("qrcode"), {
+                text: targetUrl,
+                width: 200,
+                height: 200,
+                colorDark : "#312e81", // 인디고 900 색상
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        // 모달 열고 닫기 함수
+        window.openQrModal = function() { qrModal.classList.remove('hidden'); };
+        window.closeQrModal = function(e) { 
+            if(e) e.stopPropagation(); 
+            qrModal.classList.add('hidden'); 
+        };
 
         btnDraw.addEventListener('click', () => {
             if (drawCount >= 20) return;
@@ -305,7 +362,6 @@
             drawCountEl.textContent = drawCount;
             await update(ref(db, `rooms/${currentPin}`), { status: 'playing' });
             
-            // 번호가 뽑히는 즉시 '완료' 학생들을 '배치중'으로 변경
             renderPlayers();
 
             if (drawCount >= 20) {
@@ -316,10 +372,7 @@
             }
         }
 
-        window.closeUnplacedModal = function() {
-            unplacedModal.classList.add('hidden');
-        };
-
+        window.closeUnplacedModal = function() { unplacedModal.classList.add('hidden'); };
         window.forceDrawNext = function() {
             unplacedModal.classList.add('hidden');
             executeDrawNumber();
