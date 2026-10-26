@@ -12,9 +12,9 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="flex flex-col items-center py-10 px-6 min-h-screen overflow-x-hidden">
+<body class="flex flex-col items-center py-6 px-6 min-h-screen overflow-x-hidden">
     
-    <h1 class="text-4xl font-bold mb-8 drop-shadow-md">스트림스 관리자 대시보드</h1>
+    <h1 class="text-4xl font-bold mb-4 drop-shadow-md">스트림스 관리자 대시보드</h1>
     
     <!-- 1. 방 생성 영역 -->
     <div id="setup-section" class="bg-white/10 p-10 rounded-3xl backdrop-blur-md text-center max-w-lg w-full mt-10">
@@ -25,52 +25,59 @@
     </div>
 
     <!-- 2. 게임 진행 영역 -->
-    <div id="game-section" class="hidden flex-col items-center w-full max-w-6xl mt-4">
-        <!-- 왼쪽으로 번호 뽑기 영역을 살짝 밀어주기 위해 justify-start 및 gap 조절 -->
-        <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8 w-full justify-start mb-8">
+    <div id="game-section" class="hidden flex-col items-center w-full max-w-7xl mt-2">
+        <div class="flex flex-col lg:flex-row items-center lg:items-start gap-6 w-full justify-start mb-6">
             
-            <!-- 왼쪽: 게임 컨트롤 (번호 뽑기 영역) -->
-            <div class="flex flex-col items-center lg:w-1/4 shrink-0">
-                <div class="flex items-center gap-3 mb-6 text-xl bg-white/20 px-6 py-3 rounded-full backdrop-blur-sm">
+            <!-- [좌측 영역]: 번호 뽑기 컨트롤 (비율: 4/12) -->
+            <div class="flex flex-col items-center lg:w-4/12 shrink-0">
+                <div class="flex items-center gap-3 mb-4 text-xl bg-white/20 px-6 py-2.5 rounded-full backdrop-blur-sm">
                     접속 PIN: <span id="room-pin" class="font-bold text-yellow-300 text-4xl tracking-wider"></span>
                 </div>
                 
-                <div class="h-60 w-60 bg-white rounded-[3rem] shadow-2xl flex items-center justify-center border-8 border-indigo-300 mb-6">
-                    <span id="current-number" class="text-[8.5rem] font-bold text-indigo-900 leading-none">?</span>
+                <div class="h-56 w-56 bg-white rounded-[2.5rem] shadow-2xl flex items-center justify-center border-8 border-indigo-300 mb-4">
+                    <span id="current-number" class="text-[8rem] font-bold text-indigo-900 leading-none">?</span>
                 </div>
                 
-                <button id="btn-draw" class="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 text-3xl px-10 py-5 rounded-3xl font-bold shadow-[0_8px_0_rgb(161,98,7)] hover:translate-y-1 hover:shadow-[0_4px_0_rgb(161,98,7)] transition-all w-full max-w-xs">
+                <button id="btn-draw" class="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 text-3xl px-8 py-4 rounded-3xl font-bold shadow-[0_8px_0_rgb(161,98,7)] hover:translate-y-1 hover:shadow-[0_4px_0_rgb(161,98,7)] transition-all w-full max-w-xs">
                     번호 뽑기 (<span id="draw-count">0</span>/20)
                 </button>
 
                 <!-- 다시 하기 버튼 -->
-                <button id="btn-reset-game" class="hidden mt-6 bg-green-500 hover:bg-green-400 text-white text-2xl px-8 py-4 rounded-2xl font-bold shadow-[0_6px_0_rgb(21,128,61)] hover:translate-y-1 hover:shadow-[0_3px_0_rgb(21,128,61)] transition-all w-full max-w-xs">
+                <button id="btn-reset-game" class="hidden mt-4 bg-green-500 hover:bg-green-400 text-white text-2xl px-8 py-4 rounded-2xl font-bold shadow-[0_6px_0_rgb(21,128,61)] hover:translate-y-1 hover:shadow-[0_3px_0_rgb(21,128,61)] transition-all w-full max-w-xs">
                     🔄 같은 방에서 다시 하기
                 </button>
             </div>
 
-            <!-- 오른쪽: 실시간 학생 대시보드 (이름, 점수 열 간격 확장) -->
-            <div class="flex-1 w-full bg-white/10 p-6 rounded-3xl backdrop-blur-md h-[480px] overflow-hidden flex flex-col">
-                <h2 class="text-2xl mb-4 text-center font-bold text-indigo-100">🏆 실시간 학생 순위표</h2>
+            <!-- [우측 영역]: 실시간 학생 대시보드 (비율: 8/12) -->
+            <div class="lg:w-8/12 w-full bg-white/10 p-6 rounded-3xl backdrop-blur-md h-[580px] overflow-hidden flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-2xl font-bold text-indigo-100">🏆 실시간 학생 순위표</h2>
+                    <!-- 실시간 제출 완료 현황 -->
+                    <div class="text-sm md:text-base bg-white/20 px-4 py-1.5 rounded-xl border border-white/20 font-bold">
+                        현재 턴 배치 완료: <span id="placed-status-count" class="text-yellow-300 text-lg">0 / 0</span>명
+                    </div>
+                </div>
+
                 <div class="overflow-y-auto no-scrollbar flex-1 pr-2">
                     <table class="w-full text-center border-collapse table-fixed">
-                        <!-- 테이블 각 열의 너비 고정 세팅 -->
                         <colgroup>
                             <col style="width: 10%;"> <!-- 순위 -->
-                            <col style="width: 20%;"> <!-- 이름 (간격 넓힘) -->
-                            <col style="width: 15%;"> <!-- 점수 (간격 넓힘) -->
-                            <col style="width: 55%;"> <!-- 타일 현황 -->
+                            <col style="width: 32%;"> <!-- 이름 -->
+                            <col style="width: 16%;"> <!-- 점수 -->
+                            <col style="width: 14%;"> <!-- 배치 상태 -->
+                            <col style="width: 28%;"> <!-- 타일 현황 -->
                         </colgroup>
                         <thead class="sticky top-0 bg-[#2e267d] z-10">
                             <tr class="text-lg text-indigo-200">
-                                <th class="p-3.5 rounded-tl-xl">순위</th>
-                                <th class="p-3.5 text-left pl-6">이름</th>
-                                <th class="p-3.5">점수</th>
-                                <th class="p-3.5 rounded-tr-xl">타일 현황 (20칸)</th>
+                                <th class="p-3 rounded-tl-xl">순위</th>
+                                <th class="p-3 text-left pl-4">이름</th>
+                                <th class="p-3">점수</th>
+                                <th class="p-3">상태</th>
+                                <th class="p-3 rounded-tr-xl">타일 현황 (20칸)</th>
                             </tr>
                         </thead>
                         <tbody id="player-list">
-                            <tr><td colspan="4" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>
+                            <tr><td colspan="5" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -79,11 +86,33 @@
         </div>
     </div>
 
+    <!-- 미배치 학생 알림 모달 창 -->
+    <div id="unplaced-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-slate-800 text-center">
+            <div class="text-5xl mb-3">⚠️</div>
+            <h3 class="text-2xl font-bold text-red-600 mb-2">아직 번호를 넣지 않은 학생이 있어요!</h3>
+            <p class="text-gray-600 mb-4 text-sm">아래 학생들이 아직 이번 번호를 배치하지 않았습니다.</p>
+            
+            <div id="unplaced-name-list" class="flex flex-wrap gap-2 justify-center max-h-40 overflow-y-auto bg-slate-100 p-3 rounded-2xl mb-6">
+                <!-- 미배치 학생 명단 태그 삽입 -->
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeUnplacedModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-3 rounded-xl font-bold text-lg">
+                    기다리기
+                </button>
+                <button onclick="forceDrawNext()" class="flex-1 bg-red-500 hover:bg-red-400 text-white py-3 rounded-xl font-bold text-lg">
+                    그냥 뽑기
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getDatabase, ref, set, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-        // ★ [필수] 본인의 firebaseConfig로 교체하세요! ★
+        // ★ [필수] 본인의 Firebase 인증키 객체로 교체하세요 ★
         const firebaseConfig = {
     apiKey: "AIzaSyC_R6-EMFx9H_L4Pp0lJWUj5rzZ_ZtCg0g",
     authDomain: "streams-game-8b9ef.firebaseapp.com",
@@ -109,6 +138,7 @@
         let availableTiles = [];
         let currentPin = "";
         let drawCount = 0;
+        let latestPlayersData = {}; // 최신 학생 데이터 캐싱
 
         const setupSection = document.getElementById('setup-section');
         const gameSection = document.getElementById('game-section');
@@ -119,6 +149,9 @@
         const btnDraw = document.getElementById('btn-draw');
         const btnResetGame = document.getElementById('btn-reset-game');
         const playerListEl = document.getElementById('player-list');
+        const placedStatusCountEl = document.getElementById('placed-status-count');
+        const unplacedModal = document.getElementById('unplaced-modal');
+        const unplacedNameList = document.getElementById('unplaced-name-list');
 
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -127,6 +160,7 @@
             }
         }
 
+        // 방 생성
         btnCreateRoom.addEventListener('click', async () => {
             currentPin = Math.floor(1000 + Math.random() * 9000).toString();
             availableTiles = [...baseTiles];
@@ -144,31 +178,46 @@
             gameSection.classList.add('flex');
             roomPinEl.textContent = currentPin;
 
+            // 실시간 순위 및 배치 상태 모니터링
             onValue(ref(db, `rooms/${currentPin}/players`), (snapshot) => {
                 playerListEl.innerHTML = '';
                 
                 if (!snapshot.exists()) {
-                    playerListEl.innerHTML = `<tr><td colspan="4" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>`;
+                    playerListEl.innerHTML = `<tr><td colspan="5" class="p-8 text-gray-300 text-lg">아직 입장한 학생이 없습니다.</td></tr>`;
+                    placedStatusCountEl.textContent = `0 / 0`;
+                    latestPlayersData = {};
                     return;
                 }
 
-                const playersData = snapshot.val();
-                const playersArray = Object.values(playersData);
+                latestPlayersData = snapshot.val();
+                const playersArray = Object.values(latestPlayersData);
+                
+                // 점수 기준 내림차순 정렬
                 playersArray.sort((a, b) => b.score - a.score);
 
+                let placedCompletedCount = 0;
+
                 playersArray.forEach((player, index) => {
+                    // 현재 학생이 채운 타일 개수 계산
+                    const filledCount = player.board ? player.board.filter(t => t !== null).length : 0;
+                    
+                    // 현재 턴 배치가 완료되었는지 판별
+                    const isPlacedThisTurn = (drawCount === 0) || (filledCount >= drawCount);
+                    if (isPlacedThisTurn && drawCount > 0) placedCompletedCount++;
+
                     const tr = document.createElement('tr');
                     tr.className = "border-b border-white/10 hover:bg-white/5 transition-colors";
 
+                    // 미니 보드 HTML
                     let boardHtml = `<div class="flex gap-1 justify-center py-2">`;
                     if (player.board) {
                         player.board.forEach(tile => {
                             if (tile === null) {
-                                boardHtml += `<div class="w-5 h-5 bg-white/20 rounded-sm text-[10px] flex items-center justify-center text-transparent">.</div>`;
+                                boardHtml += `<div class="w-4 h-4 bg-white/20 rounded-sm text-[8px] flex items-center justify-center text-transparent">.</div>`;
                             } else if (tile === '★') {
-                                boardHtml += `<div class="w-5 h-5 bg-yellow-400 text-yellow-900 rounded-sm font-bold text-[12px] flex items-center justify-center">★</div>`;
+                                boardHtml += `<div class="w-4 h-4 bg-yellow-400 text-yellow-900 rounded-sm font-bold text-[10px] flex items-center justify-center">★</div>`;
                             } else {
-                                boardHtml += `<div class="w-5 h-5 bg-white text-indigo-900 rounded-sm font-bold text-[11px] flex items-center justify-center">${tile}</div>`;
+                                boardHtml += `<div class="w-4 h-4 bg-white text-indigo-900 rounded-sm font-bold text-[10px] flex items-center justify-center">${tile}</div>`;
                             }
                         });
                     }
@@ -179,25 +228,73 @@
                     else if (index === 1) rankDisplay = '🥈';
                     else if (index === 2) rankDisplay = '🥉';
 
+                    // 상태 배지 (초록 완료 / 주황 배치중)
+                    let statusBadge = '';
+                    if (drawCount === 0) {
+                        statusBadge = `<span class="text-xs bg-slate-500/40 text-slate-200 px-2.5 py-1 rounded-full font-bold">대기</span>`;
+                    } else if (isPlacedThisTurn) {
+                        statusBadge = `<span class="text-xs bg-emerald-500/30 border border-emerald-400/50 text-emerald-300 px-2.5 py-1 rounded-full font-bold">완료</span>`;
+                    } else {
+                        statusBadge = `<span class="text-xs bg-amber-500/30 border border-amber-400/50 text-amber-300 px-2.5 py-1 rounded-full font-bold animate-pulse">배치중</span>`;
+                    }
+
                     tr.innerHTML = `
-                        <td class="p-3.5 text-2xl font-bold">${rankDisplay}</td>
-                        <td class="p-3.5 text-xl font-bold text-left pl-6 truncate">${player.name}</td>
-                        <td class="p-3.5 text-2xl font-bold text-yellow-300">${player.score}점</td>
-                        <td class="p-3.5">${boardHtml}</td>
+                        <td class="p-3 text-2xl font-bold">${rankDisplay}</td>
+                        <td class="p-3 text-lg font-bold text-left pl-4 truncate">${player.name}</td>
+                        <td class="p-3 text-2xl font-bold text-yellow-300">${player.score}점</td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3">${boardHtml}</td>
                     `;
                     playerListEl.appendChild(tr);
                 });
+
+                // 상단 카운트 갱신
+                if (drawCount > 0) {
+                    placedStatusCountEl.textContent = `${placedCompletedCount} / ${playersArray.length}`;
+                } else {
+                    placedStatusCountEl.textContent = `0 / ${playersArray.length}`;
+                }
             });
         });
 
-        btnDraw.addEventListener('click', async () => {
+        // 번호 뽑기 버튼 클릭 시 (미배치 학생 체크)
+        btnDraw.addEventListener('click', () => {
             if (drawCount >= 20) return;
 
+            // 이전 번호가 있고 아직 학생들이 다 채우지 않은 경우 확인
+            if (drawCount > 0) {
+                const unplacedStudents = [];
+                for (const key in latestPlayersData) {
+                    const p = latestPlayersData[key];
+                    const filled = p.board ? p.board.filter(t => t !== null).length : 0;
+                    if (filled < drawCount) {
+                        unplacedStudents.push(p.name);
+                    }
+                }
+
+                // 미배치 학생이 1명이라도 있으면 모달 경고창 띄움
+                if (unplacedStudents.length > 0) {
+                    unplacedNameList.innerHTML = unplacedStudents.map(name => `
+                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-sm font-bold border border-red-200">
+                            ${name}
+                        </span>
+                    `).join('');
+                    unplacedModal.classList.remove('hidden');
+                    return;
+                }
+            }
+
+            // 모든 학생이 배치 완료했으면 바로 다음 번호 뽑기
+            executeDrawNumber();
+        });
+
+        // 실제 번호 뽑기 실행 로직
+        async function executeDrawNumber() {
             const drawnTile = availableTiles.pop();
             currentNumberEl.textContent = drawnTile;
             currentNumberEl.className = drawnTile === '★' 
-                ? 'text-[8.5rem] font-bold text-yellow-400 leading-none drop-shadow-lg' 
-                : 'text-[8.5rem] font-bold text-indigo-900 leading-none';
+                ? 'text-[8rem] font-bold text-yellow-400 leading-none drop-shadow-lg' 
+                : 'text-[8rem] font-bold text-indigo-900 leading-none';
             
             const drawnRef = ref(db, `rooms/${currentPin}/drawnNumbers/${drawCount}`);
             await set(drawnRef, drawnTile);
@@ -212,15 +309,27 @@
                 btnResetGame.classList.remove('hidden');
                 setTimeout(() => alert("20개의 타일을 모두 뽑았습니다! 최종 랭킹을 확인하세요."), 500);
             }
-        });
+        }
 
+        // 모달 닫기 (기다리기)
+        window.closeUnplacedModal = function() {
+            unplacedModal.classList.add('hidden');
+        };
+
+        // 모달에서 '그냥 뽑기' 강제 진행
+        window.forceDrawNext = function() {
+            unplacedModal.classList.add('hidden');
+            executeDrawNumber();
+        };
+
+        // 다시 하기 리셋
         btnResetGame.addEventListener('click', async () => {
             availableTiles = [...baseTiles];
             shuffle(availableTiles);
             drawCount = 0;
 
             currentNumberEl.textContent = "?";
-            currentNumberEl.className = 'text-[8.5rem] font-bold text-indigo-900 leading-none';
+            currentNumberEl.className = 'text-[8rem] font-bold text-indigo-900 leading-none';
             drawCountEl.textContent = drawCount;
             
             btnDraw.disabled = false;
